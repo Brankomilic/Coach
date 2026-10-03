@@ -33,6 +33,8 @@ ul{margin:6px 0 0;padding-left:18px}li{margin:4px 0}small,a{color:var(--mu);font
  <div class="card"><div class="k">Volumen semanal (h)</div><div id="c2"></div></div>
  <div class="card"><div class="k">HRV (ms) · 30 días</div><div id="c3"></div><small id="n3"></small></div>
  <div class="card"><div class="k">FC en reposo (lpm) · 30 días</div><div id="c4"></div><small id="n4"></small></div>
+ <div class="card"><div class="k">Sueño (h) · 30 días</div><div id="c6"></div><small id="n6"></small></div>
+ <div class="card"><div class="k">Pasos (miles) · 14 días</div><div id="c7"></div></div>
  <div class="card"><div class="k">Peso (kg)</div><div id="c5"></div><small>Objetivo: 80 kg en primavera. Se ignoran pesos a más de 3 kg de la mediana.</small></div>
 </section>
 <section id="c" class="sec"></section>
@@ -58,13 +60,27 @@ $(id).innerHTML=s+`<text x="${p}" y="${h-4}" font-size="10" fill="${C('--mu')}">
 function bars(id,v,l){const w=340,h=150,p=26,mx=Math.max(1,Math.ceil(Math.max(...v))),bw=(w-p-6)/v.length;let s=`<svg viewBox="0 0 ${w} ${h}">`;
 [0,mx/2,mx].forEach(t=>{const y=h-18-t*(h-30)/mx;s+=`<line x1="${p}" x2="${w-6}" y1="${y}" y2="${y}" stroke="${C('--bd')}"/><text x="2" y="${y+4}" font-size="10" fill="${C('--mu')}">${Math.round(t)}</text>`});
 v.forEach((a,i)=>{const bh=a*(h-30)/mx;s+=`<rect x="${p+i*bw+2}" y="${h-18-bh}" width="${bw-4}" height="${bh}" rx="3" fill="${C('--c3')}"/><text x="${p+i*bw+bw/2}" y="${h-5}" font-size="8" text-anchor="middle" fill="${C('--mu')}">${l[i]}</text>`});$(id).innerHTML=s+'</svg>'}
+let HK='',HF='';try{HK=localStorage.getItem('hevyk')||'';HF=localStorage.getItem('hevyf')||''}catch(e){}
+const e2=s=>String(s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+async function hv(p){const r=await fetch('https://api.hevyapp.com/v1'+p,{headers:{'api-key':HK}});if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}
+async function pg(p,key,max){let o=[];for(let i=1;i<=max;i++){const j=await hv(p+'?page='+i+'&pageSize=10');o=o.concat(j[key]||[]);if(i>=(j.page_count||1))break}return o}
+async function hevy(){
+ const bx=document.createElement('div');bx.className='card';$('c').prepend(bx);
+ if(!HK){bx.innerHTML='<div class="k">Fuerza · Hevy</div><p style="margin:6px 0">Pega tu clave de API de Hevy (opcional). Se guarda solo en este navegador.</p><input id="hk" type="password" placeholder="Hevy API key" autocomplete="off"><button class="btn" id="hs" style="width:100%">Guardar</button>';$('hs').onclick=()=>{HK=$('hk').value.trim();if(!HK)return;try{localStorage.setItem('hevyk',HK)}catch(x){}load()};return}
+ try{
+  const [fo,ro,wo]=await Promise.all([hv('/routine_folders?page=1&pageSize=10'),pg('/routines','routines',4),pg('/workouts','workouts',2)]),fl=fo.routine_folders||[];
+  if(!fl.find(f=>String(f.id)===HF)){bx.innerHTML='<div class="k">Fuerza · Hevy</div><p style="margin:6px 0">Elige la carpeta de tu plan:</p><select id="hf" style="width:100%;padding:10px;border-radius:10px;font:inherit"><option value="">Selecciona…</option>'+fl.map(f=>`<option value="${f.id}">${e2(f.title)}</option>`).join('')+'</select>';$('hf').onchange=e=>{HF=e.target.value;try{localStorage.setItem('hevyf',HF)}catch(x){}load()};return}
+  const T=new Date(),m=new Date(T);m.setDate(T.getDate()-((T.getDay()+6)%7));const mon=iso(m),dn=wo.filter(w=>(w.start_time||'').slice(0,10)>=mon),ids=new Set(dn.map(w=>w.routine_id).filter(Boolean)),ts=new Set(dn.map(w=>(w.title||'').trim().toLowerCase())),pl=ro.filter(r=>String(r.folder_id)===HF),isd=r=>ids.has(r.id)||ts.has((r.title||'').trim().toLowerCase()),pe=pl.filter(r=>!isd(r));
+  bx.innerHTML=`<div class="k">Fuerza · Hevy · esta semana</div><div class="v">${pl.length-pe.length} / ${pl.length}<span class="u"> hechas</span></div>${pe.length?'<div style="margin-top:8px"><b>Pendientes:</b></div><ul>'+pe.map(r=>`<li>${e2(r.title)} <span class="u">${(r.exercises||[]).length} ejercicios</span></li>`).join('')+'</ul>':'<p style="margin:8px 0 0">No te queda ninguna pendiente esta semana.</p>'}<small style="display:block;margin-top:8px">Se cuenta como hecha la rutina cuyo entreno de esta semana tiene su mismo título. <a href="#" id="hx">Cambiar carpeta</a></small>`;
+  $('hx').onclick=e=>{e.preventDefault();HF='';try{localStorage.removeItem('hevyf')}catch(x){}load()};
+ }catch(e){if(/40[13]/.test(e.message)){try{localStorage.removeItem('hevyk')}catch(x){}HK=''}bx.innerHTML='<div class="k">Fuerza · Hevy</div><p style="margin:6px 0">No se pudo leer Hevy ('+e2(e.message)+'). Puede ser la clave, que falte Hevy PRO o un bloqueo del navegador (CORS).</p>'}}
 async function load(){
  $('err').style.display='none';
  if(!K){$('setup').style.display='block';$('sub').textContent='';return}
  $('setup').style.display='none';$('sub').textContent='Cargando…';
  const T=new Date(),o90=iso(new Date(T-90*864e5)),today=iso(T);
- let W,A;
- try{[W,A]=await Promise.all([api(`/wellness?oldest=${o90}&newest=${today}`),api(`/activities?oldest=${iso(new Date(T-77*864e5))}&newest=${today}`)])}
+ let W,A,EV=[],EVERR='';
+ try{[W,A,EV]=await Promise.all([api(`/wellness?oldest=${o90}&newest=${today}`),api(`/activities?oldest=${iso(new Date(T-77*864e5))}&newest=${today}`),api(`/events?oldest=${today}&newest=${iso(new Date(T.getTime()+14*864e5))}`).catch(e=>{EVERR=e.message;return[]})])}
  catch(e){if(String(e.message).includes('401')||String(e.message).includes('403')){try{localStorage.removeItem('icuk')}catch(x){}K='';$('setup').style.display='block';err('La clave no es válida. Pega una nueva.')}
   else err('No se pudo conectar con intervals.icu ('+e.message+'). Si es un error de red, probablemente el navegador bloquea la petición (CORS) y hace falta un proxy.');return}
  W.sort((a,b)=>a.id<b.id?-1:1);
@@ -88,11 +104,19 @@ async function load(){
  const h30=hv.slice(-30),r30=rh.slice(-30);
  line('c3',[h30.map(x=>x.hrv)],['--c3'],{ref:hB,l:[h30[0].id.slice(5),h30[h30.length-1].id.slice(5)]});$('n3').textContent='Media 60 días: '+f(hB,0)+' ms';
  line('c4',[r30.map(x=>x.restingHR)],['--c2'],{ref:rB,l:[r30[0].id.slice(5),r30[r30.length-1].id.slice(5)]});$('n4').textContent='Media 60 días: '+f(rB,0)+' lpm';
+ const s30=sl.slice(-30);
+ if(s30.length>1){line('c6',[s30.map(x=>x.sleepSecs/3600)],['--c3'],{ref:sB,min:4,l:[s30[0].id.slice(5),s30[s30.length-1].id.slice(5)]});$('n6').textContent='Media 60 días: '+f(sB)+' h'}else $('c6').innerHTML='<small>Sin datos de sueño.</small>';
+ const st=W.filter(x=>x.steps!=null&&x.steps>0).slice(-14);
+ if(st.length>1)bars('c7',st.map(x=>x.steps/1000),st.map(x=>x.id.slice(8)));else $('c7').innerHTML='<small>intervals.icu no está recibiendo pasos de tu reloj.</small>';
  const wp=W.filter(x=>x.weight!=null),m=wp.length?med(wp.map(x=>x.weight)):0,wg=wp.filter(x=>Math.abs(x.weight-m)<=3);
  if(wg.length>1)line('c5',[wg.map(x=>x.weight)],['--c1'],{dots:true,l:[wg[0].id.slice(5),wg[wg.length-1].id.slice(5)]});
  const wl=wg.length?wg[wg.length-1].weight:null,lw=wks.slice(-6).map(k=>wk[k]),l4=avg(lw.slice(0,5));
  const cl=w90.filter(x=>x.id>=iso(new Date(T-14*864e5)));
- $('c').innerHTML=`<div class="card"><div class="k">Cifras clave (calculadas hoy)</div><ul>
+ const esc=s=>String(s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+ const pl=(Array.isArray(EV)?EV:[]).filter(e=>e.category==='WORKOUT').sort((a,b)=>a.start_date_local<b.start_date_local?-1:1).slice(0,3);
+ const tip=ratio<.85?'Recuperación baja: pasa a Z2 suave o descansa.':ratio<.95?'Recuperación media: baja un escalón si las piernas van pesadas.':'Recuperación buena: sigue el plan.';
+ const planHtml=`<div class="card"><div class="k">Próximas sesiones de rodillo</div>${pl.length?pl.map((e,i)=>{const d=new Date(e.start_date_local),mins=e.moving_time?Math.round(e.moving_time/60)+' min':'',ds=(e.description||'').split('\n')[0].slice(0,120);return `<div style="margin-top:10px"><b>${esc(d.toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'}))}</b> · ${esc(e.name)} <span class="u">${mins}</span>${ds?`<div class="u">${esc(ds)}</div>`:''}${i===0?`<div style="margin-top:4px"><span class="pill" style="background:${lvl[1]}">${tip}</span></div>`:''}</div>`}).join(''):(EVERR?'<p style="margin:6px 0 0">No se pudo leer el calendario ('+esc(EVERR)+').</p>':'<p style="margin:6px 0 0">No hay sesiones de rodillo en los próximos 14 días.</p>')}<small style="display:block;margin-top:8px">Fuerza y cinta se planifican en Garmin Connect y no aparecen aquí.</small></div>`;
+ $('c').innerHTML=planHtml+`<div class="card"><div class="k">Cifras clave (calculadas hoy)</div><ul>
  <li><b>Sueño:</b> media de ${f(sB)} h en 60 días.</li>
  <li><b>HRV:</b> base ${f(hB,0)} ms; últimos 3 días ${f(h3,0)} ms.</li>
  <li><b>FC en reposo:</b> base ${f(rB,0)} lpm.</li>
@@ -100,8 +124,8 @@ async function load(){
  <li><b>Volumen:</b> ${f(avg(wks.slice(-4,-1).map(k=>wk[k])))} h/semana de media en las últimas 3 semanas cerradas.</li>
  <li><b>Peso:</b> ${f(wl)} kg · faltan ${f(wl?wl-80:null)} kg para el objetivo de 80.</li></ul></div>
  <div class="card"><small>Cifras automáticas de intervals.icu. Para el análisis completo (qué cambiar en el plan), pídeselo a Claude.</small></div>`;
- $('sub').textContent='Actualizado '+T.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})+' · '+today;
- $('app').style.display='block';
+ $('sub').textContent='Actualizado '+T.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})+' · '+today+' · v3';
+ $('app').style.display='block';hevy();
 }
 load();
 </script></main></body></html>
