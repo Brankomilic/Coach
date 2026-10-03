@@ -34,7 +34,7 @@ ul{margin:6px 0 0;padding-left:18px}li{margin:4px 0}small,a{color:var(--mu);font
  <div class="card"><div class="k">HRV (ms) · 30 días</div><div id="c3"></div><small id="n3"></small></div>
  <div class="card"><div class="k">FC en reposo (lpm) · 30 días</div><div id="c4"></div><small id="n4"></small></div>
  <div class="card"><div class="k">Sueño (h) · 30 días</div><div id="c6"></div><small id="n6"></small></div>
- <div class="card"><div class="k">Pasos (miles) · 14 días</div><div id="c7"></div></div>
+ <div class="card"><div class="k">Pasos (miles) · 14 días</div><div id="c7"></div><div class="lg"><span><i style="background:var(--c3)"></i>Objetivo 8.000 cumplido</span><span><i style="background:var(--bad)"></i>No cumplido</span></div></div>
  <div class="card"><div class="k">Peso (kg)</div><div id="c5"></div><small>Objetivo: 80 kg en primavera. Se ignoran pesos a más de 3 kg de la mediana.</small></div>
 </section>
 <section id="c" class="sec"></section>
@@ -57,23 +57,11 @@ function line(id,ser,cols,o={}){const w=340,h=150,p=26,all=ser.flat(),mn=o.min??
 if(o.ref)s+=`<line x1="${p}" x2="${w-6}" y1="${y(o.ref)}" y2="${y(o.ref)}" stroke="${C('--mu')}" stroke-dasharray="4 3"/>`;
 ser.forEach((a,k)=>s+=`<polyline fill="none" stroke="${C(cols[k])}" stroke-width="2" stroke-linejoin="round" points="${a.map((v,i)=>x(i)+','+y(v)).join(' ')}"/>`+(o.dots?a.map((v,i)=>`<circle cx="${x(i)}" cy="${y(v)}" r="2.5" fill="${C(cols[k])}"/>`).join(''):''));
 $(id).innerHTML=s+`<text x="${p}" y="${h-4}" font-size="10" fill="${C('--mu')}">${o.l[0]}</text><text x="${w-6}" y="${h-4}" font-size="10" text-anchor="end" fill="${C('--mu')}">${o.l[1]}</text></svg>`}
-function bars(id,v,l){const w=340,h=150,p=26,mx=Math.max(1,Math.ceil(Math.max(...v))),bw=(w-p-6)/v.length;let s=`<svg viewBox="0 0 ${w} ${h}">`;
-[0,mx/2,mx].forEach(t=>{const y=h-18-t*(h-30)/mx;s+=`<line x1="${p}" x2="${w-6}" y1="${y}" y2="${y}" stroke="${C('--bd')}"/><text x="2" y="${y+4}" font-size="10" fill="${C('--mu')}">${Math.round(t)}</text>`});
-v.forEach((a,i)=>{const bh=a*(h-30)/mx;s+=`<rect x="${p+i*bw+2}" y="${h-18-bh}" width="${bw-4}" height="${bh}" rx="3" fill="${C('--c3')}"/><text x="${p+i*bw+bw/2}" y="${h-5}" font-size="8" text-anchor="middle" fill="${C('--mu')}">${l[i]}</text>`});$(id).innerHTML=s+'</svg>'}
-let HK='',HF='';try{HK=localStorage.getItem('hevyk')||'';HF=localStorage.getItem('hevyf')||''}catch(e){}
-const e2=s=>String(s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
-async function hv(p){const r=await fetch('https://api.hevyapp.com/v1'+p,{headers:{'api-key':HK}});if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}
-async function pg(p,key,max){let o=[];for(let i=1;i<=max;i++){const j=await hv(p+'?page='+i+'&pageSize=10');o=o.concat(j[key]||[]);if(i>=(j.page_count||1))break}return o}
-async function hevy(){
- const bx=document.createElement('div');bx.className='card';$('c').prepend(bx);
- if(!HK){bx.innerHTML='<div class="k">Fuerza · Hevy</div><p style="margin:6px 0">Pega tu clave de API de Hevy (opcional). Se guarda solo en este navegador.</p><input id="hk" type="password" placeholder="Hevy API key" autocomplete="off"><button class="btn" id="hs" style="width:100%">Guardar</button>';$('hs').onclick=()=>{HK=$('hk').value.trim();if(!HK)return;try{localStorage.setItem('hevyk',HK)}catch(x){}load()};return}
- try{
-  const [fo,ro,wo]=await Promise.all([hv('/routine_folders?page=1&pageSize=10'),pg('/routines','routines',4),pg('/workouts','workouts',2)]),fl=fo.routine_folders||[];
-  if(!fl.find(f=>String(f.id)===HF)){bx.innerHTML='<div class="k">Fuerza · Hevy</div><p style="margin:6px 0">Elige la carpeta de tu plan:</p><select id="hf" style="width:100%;padding:10px;border-radius:10px;font:inherit"><option value="">Selecciona…</option>'+fl.map(f=>`<option value="${f.id}">${e2(f.title)}</option>`).join('')+'</select>';$('hf').onchange=e=>{HF=e.target.value;try{localStorage.setItem('hevyf',HF)}catch(x){}load()};return}
-  const T=new Date(),m=new Date(T);m.setDate(T.getDate()-((T.getDay()+6)%7));const mon=iso(m),dn=wo.filter(w=>(w.start_time||'').slice(0,10)>=mon),ids=new Set(dn.map(w=>w.routine_id).filter(Boolean)),ts=new Set(dn.map(w=>(w.title||'').trim().toLowerCase())),pl=ro.filter(r=>String(r.folder_id)===HF),isd=r=>ids.has(r.id)||ts.has((r.title||'').trim().toLowerCase()),pe=pl.filter(r=>!isd(r));
-  bx.innerHTML=`<div class="k">Fuerza · Hevy · esta semana</div><div class="v">${pl.length-pe.length} / ${pl.length}<span class="u"> hechas</span></div>${pe.length?'<div style="margin-top:8px"><b>Pendientes:</b></div><ul>'+pe.map(r=>`<li>${e2(r.title)} <span class="u">${(r.exercises||[]).length} ejercicios</span></li>`).join('')+'</ul>':'<p style="margin:8px 0 0">No te queda ninguna pendiente esta semana.</p>'}<small style="display:block;margin-top:8px">Se cuenta como hecha la rutina cuyo entreno de esta semana tiene su mismo título. <a href="#" id="hx">Cambiar carpeta</a></small>`;
-  $('hx').onclick=e=>{e.preventDefault();HF='';try{localStorage.removeItem('hevyf')}catch(x){}load()};
- }catch(e){if(/40[13]/.test(e.message)){try{localStorage.removeItem('hevyk')}catch(x){}HK=''}bx.innerHTML='<div class="k">Fuerza · Hevy</div><p style="margin:6px 0">No se pudo leer Hevy ('+e2(e.message)+'). Puede ser la clave, que falte Hevy PRO o un bloqueo del navegador (CORS).</p>'}}
+function bars(id,v,l,g){const w=340,h=150,p=26,mx=Math.max(1,Math.ceil(Math.max(...v,g||0))),bw=(w-p-6)/v.length,Y=t=>h-18-t*(h-30)/mx;let s=`<svg viewBox="0 0 ${w} ${h}">`;
+[0,mx/2,mx].forEach(t=>{s+=`<line x1="${p}" x2="${w-6}" y1="${Y(t)}" y2="${Y(t)}" stroke="${C('--bd')}"/><text x="2" y="${Y(t)+4}" font-size="10" fill="${C('--mu')}">${Math.round(t)}</text>`});
+v.forEach((a,i)=>{const col=g?(a>=g?C('--c3'):C('--bad')):C('--c3');s+=`<rect x="${p+i*bw+2}" y="${Y(a)}" width="${bw-4}" height="${a*(h-30)/mx}" rx="3" fill="${col}"/><text x="${p+i*bw+bw/2}" y="${h-5}" font-size="8" text-anchor="middle" fill="${C('--mu')}">${l[i]}</text>`});
+if(g)s+=`<line x1="${p}" x2="${w-6}" y1="${Y(g)}" y2="${Y(g)}" stroke="${C('--tx')}" stroke-dasharray="4 3"/><text x="${w-6}" y="${Y(g)-3}" font-size="9" text-anchor="end" fill="${C('--tx')}">objetivo ${g}</text>`;
+$(id).innerHTML=s+'</svg>'}
 async function load(){
  $('err').style.display='none';
  if(!K){$('setup').style.display='block';$('sub').textContent='';return}
@@ -107,7 +95,7 @@ async function load(){
  const s30=sl.slice(-30);
  if(s30.length>1){line('c6',[s30.map(x=>x.sleepSecs/3600)],['--c3'],{ref:sB,min:4,l:[s30[0].id.slice(5),s30[s30.length-1].id.slice(5)]});$('n6').textContent='Media 60 días: '+f(sB)+' h'}else $('c6').innerHTML='<small>Sin datos de sueño.</small>';
  const st=W.filter(x=>x.steps!=null&&x.steps>0).slice(-14);
- if(st.length>1)bars('c7',st.map(x=>x.steps/1000),st.map(x=>x.id.slice(8)));else $('c7').innerHTML='<small>intervals.icu no está recibiendo pasos de tu reloj.</small>';
+ if(st.length>1)bars('c7',st.map(x=>x.steps/1000),st.map(x=>x.id.slice(8)),8);else $('c7').innerHTML='<small>intervals.icu no está recibiendo pasos de tu reloj.</small>';
  const wp=W.filter(x=>x.weight!=null),m=wp.length?med(wp.map(x=>x.weight)):0,wg=wp.filter(x=>Math.abs(x.weight-m)<=3);
  if(wg.length>1)line('c5',[wg.map(x=>x.weight)],['--c1'],{dots:true,l:[wg[0].id.slice(5),wg[wg.length-1].id.slice(5)]});
  const wl=wg.length?wg[wg.length-1].weight:null,lw=wks.slice(-6).map(k=>wk[k]),l4=avg(lw.slice(0,5));
@@ -116,7 +104,9 @@ async function load(){
  const pl=(Array.isArray(EV)?EV:[]).filter(e=>e.category==='WORKOUT').sort((a,b)=>a.start_date_local<b.start_date_local?-1:1).slice(0,3);
  const tip=ratio<.85?'Recuperación baja: pasa a Z2 suave o descansa.':ratio<.95?'Recuperación media: baja un escalón si las piernas van pesadas.':'Recuperación buena: sigue el plan.';
  const planHtml=`<div class="card"><div class="k">Próximas sesiones de rodillo</div>${pl.length?pl.map((e,i)=>{const d=new Date(e.start_date_local),mins=e.moving_time?Math.round(e.moving_time/60)+' min':'',ds=(e.description||'').split('\n')[0].slice(0,120);return `<div style="margin-top:10px"><b>${esc(d.toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'}))}</b> · ${esc(e.name)} <span class="u">${mins}</span>${ds?`<div class="u">${esc(ds)}</div>`:''}${i===0?`<div style="margin-top:4px"><span class="pill" style="background:${lvl[1]}">${tip}</span></div>`:''}</div>`}).join(''):(EVERR?'<p style="margin:6px 0 0">No se pudo leer el calendario ('+esc(EVERR)+').</p>':'<p style="margin:6px 0 0">No hay sesiones de rodillo en los próximos 14 días.</p>')}<small style="display:block;margin-top:8px">Fuerza y cinta se planifican en Garmin Connect y no aparecen aquí.</small></div>`;
- $('c').innerHTML=planHtml+`<div class="card"><div class="k">Cifras clave (calculadas hoy)</div><ul>
+ const rd=[...A].filter(a=>/Ride/.test(a.type||'')).sort((a,b)=>a.start_date_local<b.start_date_local?-1:1).pop(),row=(k,v)=>v==null?'':`<div><div class="v" style="font-size:20px">${v}</div><div class="u">${k}</div></div>`;
+ const rideHtml=rd?`<div class="card"><div class="k">Última sesión de bici · ${rd.start_date_local.slice(0,10)}</div><div style="font-weight:600;margin:4px 0">${esc(rd.name)}</div><div class="grid g3">${row('Duración',rd.moving_time?Math.round(rd.moving_time/60)+' min':null)}${row('Distancia',rd.distance?f(rd.distance/1000)+' km':null)}${row('Carga',rd.icu_training_load!=null?Math.round(rd.icu_training_load):null)}${row('Pot. media',rd.icu_average_watts?Math.round(rd.icu_average_watts)+' W':null)}${row('NP',rd.icu_weighted_avg_watts?Math.round(rd.icu_weighted_avg_watts)+' W':null)}${row('FC media',rd.average_heartrate?Math.round(rd.average_heartrate)+' lpm':null)}${row('Intensidad',rd.icu_intensity?Math.round(rd.icu_intensity)+'%':null)}${row('Desnivel',rd.total_elevation_gain?Math.round(rd.total_elevation_gain)+' m':null)}</div></div>`:'';
+ $('c').innerHTML=rideHtml+planHtml+`<div class="card"><div class="k">Cifras clave (calculadas hoy)</div><ul>
  <li><b>Sueño:</b> media de ${f(sB)} h en 60 días.</li>
  <li><b>HRV:</b> base ${f(hB,0)} ms; últimos 3 días ${f(h3,0)} ms.</li>
  <li><b>FC en reposo:</b> base ${f(rB,0)} lpm.</li>
@@ -124,8 +114,8 @@ async function load(){
  <li><b>Volumen:</b> ${f(avg(wks.slice(-4,-1).map(k=>wk[k])))} h/semana de media en las últimas 3 semanas cerradas.</li>
  <li><b>Peso:</b> ${f(wl)} kg · faltan ${f(wl?wl-80:null)} kg para el objetivo de 80.</li></ul></div>
  <div class="card"><small>Cifras automáticas de intervals.icu. Para el análisis completo (qué cambiar en el plan), pídeselo a Claude.</small></div>`;
- $('sub').textContent='Actualizado '+T.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})+' · '+today+' · v3';
- $('app').style.display='block';hevy();
+ $('sub').textContent='Actualizado '+T.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})+' · '+today+' · v5';
+ $('app').style.display='block';
 }
 load();
 </script></main></body></html>
