@@ -33,6 +33,7 @@ ul{margin:6px 0 0;padding-left:18px}li{margin:4px 0}small,a{color:var(--mu);font
  <div class="card"><div class="k">Volumen semanal (h)</div><div id="c2"></div></div>
  <div class="card"><div class="k">HRV (ms) · 30 días</div><div id="c3"></div><small id="n3"></small></div>
  <div class="card"><div class="k">FC en reposo (lpm) · 30 días</div><div id="c4"></div><small id="n4"></small></div>
+ <div class="card"><div class="k">Calorías diarias · objetivo 1800</div><div id="c8"></div><div class="lg"><span><i style="background:var(--ok)"></i>1600–1800</span><span><i style="background:var(--bad)"></i>Más de 1800</span><span><i style="background:var(--c2)"></i>Menos de 1600</span></div></div>
  <div class="card"><div class="k">Sueño (h) · 30 días</div><div id="c6"></div><small id="n6"></small></div>
  <div class="card"><div class="k">Pasos (miles) · 14 días</div><div id="c7"></div><div class="lg"><span><i style="background:var(--c3)"></i>Objetivo 8.000 cumplido</span><span><i style="background:var(--bad)"></i>No cumplido</span></div></div>
  <div class="card"><div class="k">Peso (kg)</div><div id="c5"></div><small>Objetivo: 80 kg en primavera. Se ignoran pesos a más de 3 kg de la mediana.</small></div>
@@ -57,9 +58,9 @@ function line(id,ser,cols,o={}){const w=340,h=150,p=26,all=ser.flat(),mn=o.min??
 if(o.ref)s+=`<line x1="${p}" x2="${w-6}" y1="${y(o.ref)}" y2="${y(o.ref)}" stroke="${C('--mu')}" stroke-dasharray="4 3"/>`;
 ser.forEach((a,k)=>s+=`<polyline fill="none" stroke="${C(cols[k])}" stroke-width="2" stroke-linejoin="round" points="${a.map((v,i)=>x(i)+','+y(v)).join(' ')}"/>`+(o.dots?a.map((v,i)=>`<circle cx="${x(i)}" cy="${y(v)}" r="2.5" fill="${C(cols[k])}"/>`).join(''):''));
 $(id).innerHTML=s+`<text x="${p}" y="${h-4}" font-size="10" fill="${C('--mu')}">${o.l[0]}</text><text x="${w-6}" y="${h-4}" font-size="10" text-anchor="end" fill="${C('--mu')}">${o.l[1]}</text></svg>`}
-function bars(id,v,l,g){const w=340,h=150,p=26,mx=Math.max(1,Math.ceil(Math.max(...v,g||0))),bw=(w-p-6)/v.length,Y=t=>h-18-t*(h-30)/mx;let s=`<svg viewBox="0 0 ${w} ${h}">`;
+function bars(id,v,l,g,cf){const w=340,h=150,p=26,mx=Math.max(1,Math.ceil(Math.max(...v,g||0))),bw=(w-p-6)/v.length,Y=t=>h-18-t*(h-30)/mx;let s=`<svg viewBox="0 0 ${w} ${h}">`;
 [0,mx/2,mx].forEach(t=>{s+=`<line x1="${p}" x2="${w-6}" y1="${Y(t)}" y2="${Y(t)}" stroke="${C('--bd')}"/><text x="2" y="${Y(t)+4}" font-size="10" fill="${C('--mu')}">${Math.round(t)}</text>`});
-v.forEach((a,i)=>{const col=g?(a>=g?C('--c3'):C('--bad')):C('--c3');s+=`<rect x="${p+i*bw+2}" y="${Y(a)}" width="${bw-4}" height="${a*(h-30)/mx}" rx="3" fill="${col}"/><text x="${p+i*bw+bw/2}" y="${h-5}" font-size="8" text-anchor="middle" fill="${C('--mu')}">${l[i]}</text>`});
+v.forEach((a,i)=>{const col=cf?cf(a):g?(a>=g?C('--c3'):C('--bad')):C('--c3');s+=`<rect x="${p+i*bw+2}" y="${Y(a)}" width="${bw-4}" height="${a*(h-30)/mx}" rx="3" fill="${col}"/><text x="${p+i*bw+bw/2}" y="${h-5}" font-size="8" text-anchor="middle" fill="${C('--mu')}">${l[i]}</text>`});
 if(g)s+=`<line x1="${p}" x2="${w-6}" y1="${Y(g)}" y2="${Y(g)}" stroke="${C('--tx')}" stroke-dasharray="4 3"/><text x="${w-6}" y="${Y(g)-3}" font-size="9" text-anchor="end" fill="${C('--tx')}">objetivo ${g}</text>`;
 $(id).innerHTML=s+'</svg>'}
 const DIET={
@@ -95,11 +96,28 @@ async function load(){
  const adv=ratio<.85?'Nada de umbral ni intervalos hoy. Z1–Z2 ≤45 min o descanso. Vuelve a intensidad tras 2 días con HRV por encima de '+Math.round(hB*.92)+'.':ratio<.95?'Sesión prevista posible, pero baja la intensidad un escalón si las piernas van pesadas.':'Haz la sesión prevista tal cual.';
  const why=ratio<.95?(lastF.atl<15?'La fatiga de entreno es baja (ATL '+f(lastF.atl,0)+'), así que la HRV baja apunta a otro estrés: sueño, alcohol, viaje o inicio de enfermedad.':'La fatiga acumulada (ATL '+f(lastF.atl,0)+') puede explicar parte de la bajada.'):'';
  const dow=T.getDay(),strength=[1,2,4].includes(dow),rides=(Array.isArray(EV)?EV:[]).some(e=>e.category==='WORKOUT'&&(e.start_date_local||'').slice(0,10)===today)||A.some(a=>/Ride/.test(a.type||'')&&(a.start_date_local||'').slice(0,10)===today),dk=rides?'b':strength?'f':'d',dl=rides&&strength?'Día de fuerza y bici':rides?'Día de bici':strength?'Día de fuerza':dow===6?'Día libre':'Día de descanso';
- const dietHtml=`<div class="card"><div class="k">Dieta de hoy · 1800 kcal</div><div style="margin:4px 0 0"><span class="pill" style="background:var(--ac)">${dl}</span></div>${DIET[dk].map(m=>`<div style="margin-top:12px"><b>${m[0]}</b> <span class="u">≈${m[1]} kcal</span>${m[2].map(o=>`<div style="margin-top:4px"><b>${o[0]}.</b> ${o[1]}</div>`).join('')}</div>`).join('')}<small style="display:block;margin-top:12px">Cualquier combinación de opciones suma unos 1800 kcal. Calorías aproximadas y pesos en crudo.</small></div>`;
+ const dietHtml=`<div class="card"><div class="k">Dieta de hoy · 1800 kcal</div><div style="margin:4px 0 0"><span class="pill" style="background:var(--ac)">${dl}</span></div><div id="dsum" style="margin-top:8px"></div><div id="dsync" class="u" style="margin-top:2px"></div>${DIET[dk].map((m,i)=>`<div style="margin-top:12px"><b>${m[0]}</b> <span class="u">≈${m[1]} kcal</span>${m[2].map(o=>`<label style="display:flex;gap:8px;margin-top:6px;align-items:flex-start"><input type="checkbox" class="dk" data-m="${i}" data-o="${o[0]}" style="width:auto;margin:3px 0 0;padding:0"><span><b>${o[0]}.</b> ${o[1]}</span></label>`).join('')}<label style="display:flex;gap:8px;margin-top:6px;align-items:center"><input type="checkbox" class="dk" data-m="${i}" data-o="X" style="width:auto;margin:0;padding:0"><span>Otra cosa:</span><input type="number" inputmode="numeric" class="dx" data-m="${i}" placeholder="kcal" style="width:80px;margin:0;padding:6px"></label><input type="text" class="dn" data-m="${i}" placeholder="Qué has comido (opcional)" style="margin:4px 0 0;padding:6px;font-size:13px"></div>`).join('')}<small style="display:block;margin-top:12px">Marca lo que comes en cada comida. Si no sigues la dieta, usa Otra cosa y escribe las kcal. Se sincroniza con intervals.icu. Calorías aproximadas y pesos en crudo.</small></div>`;
  $('a').innerHTML=`<div class="grid"><div class="card"><div class="k">Días a objetivo</div><div class="v">${Math.round((E-T)/864e5)}</div><div class="u">30 abr 2027 · sin carrera</div></div><div class="card"><div class="k">Bloque</div><div class="v">${cw} / ${tw}</div><div class="u">semanas desde 7 sep</div></div></div>
  <div class="card"><div class="k">Forma · fatiga · frescura</div><div class="grid g3"><div><div class="v">${f(lastF.ctl)}</div><div class="u">Forma</div></div><div><div class="v">${f(lastF.atl)}</div><div class="u">Fatiga</div></div><div><div class="v" style="color:${tsb>=0?'var(--ok)':'var(--bad)'}">${tsb>0?'+':''}${f(tsb)}</div><div class="u">Frescura</div></div></div></div>
  <div class="card"><div class="k">Última noche · ${lastH.id||''}</div><div class="grid g3"><div><div class="v">${f(lastH.sleepSecs?lastH.sleepSecs/3600:null)}<span class="u">h</span></div><div class="u">Sueño · media ${f(sB)}</div></div><div><div class="v" style="color:${lvl[1]}">${f(lastH.hrv,0)}<span class="u">ms</span></div><div class="u">HRV · base ${f(hB,0)}</div></div><div><div class="v">${f(lastH.restingHR,0)}<span class="u">lpm</span></div><div class="u">FC rep. · base ${f(rB,0)}</div></div></div></div>
  <div class="card read"><div class="k">Lectura del coach</div><p style="margin:6px 0"><span class="pill" style="background:${lvl[1]}">${lvl[0]}</span></p><p style="margin:6px 0">HRV media de los últimos 3 días: ${f(h3,0)} ms (${Math.round(ratio*100)}% de tu base de 60 días).</p>${why?`<p style="margin:6px 0">${why}</p>`:''}<p style="margin:6px 0"><b>Hoy:</b> ${adv}</p></div>`+dietHtml;
+ const DK='dieta'+today,DX='dietx'+today;let ds={},dx={};try{ds=JSON.parse(localStorage.getItem(DK)||'{}');dx=JSON.parse(localStorage.getItem(DX)||'{}')}catch(x){}
+ const wt=W.find(x=>x.id===today)||{},cl0=String(wt.comments||'').split('\n'),dl0=cl0.find(l=>l.startsWith('[dieta] ')),cmt=cl0.filter(l=>!l.startsWith('[dieta] ')).join('\n').trim();
+ if(dl0){try{const o=JSON.parse(dl0.slice(8));ds=o.s||{};dx=o.x||{}}catch(x){}}
+ const tot=()=>DIET[dk].reduce((a,m,i)=>a+(ds[i]==='X'?(+(dx[i]&&dx[i].k)||0):ds[i]?m[1]:0),0);
+ let stm=null;const sync=()=>{clearTimeout(stm);stm=setTimeout(async()=>{const has=Object.keys(ds).length>0;try{const r=await fetch(API+'/wellness/'+today,{method:'PUT',headers:{Authorization:'Basic '+btoa('API_KEY:'+K),'Content-Type':'application/json'},body:JSON.stringify({kcalConsumed:has?tot():null,comments:(cmt?cmt+'\n':'')+(has?'[dieta] '+JSON.stringify({s:ds,x:dx}):'')})});if(!r.ok)throw new Error('HTTP '+r.status);$('dsync').textContent='Sincronizado con intervals.icu'}catch(e){$('dsync').textContent='Solo guardado en este móvil ('+e.message+')'}},800)};
+ const save=()=>{try{localStorage.setItem(DK,JSON.stringify(ds));localStorage.setItem(DX,JSON.stringify(dx))}catch(x){}sync()};
+ const drawCal=()=>{const mp={};W.forEach(x=>{if(x.kcalConsumed>0)mp[x.id]=x.kcalConsumed});const dd=[];
+  for(let k=13;k>=0;k--){const d=iso(new Date(T-k*864e5));let v=mp[d];if(d===today){if(Object.keys(ds).length)v=tot()}else if(v==null){try{const l=localStorage.getItem('dtot'+d);if(l!==null)v=+l}catch(x){}}if(v!=null)dd.push([d,v])}
+  if(!dd.length){$('c8').innerHTML='<small>Aún no hay días registrados. Marca lo que comes en la pestaña Hoy.</small>';return}
+  bars('c8',dd.map(x=>x[1]),dd.map(x=>x[0].slice(8)),1800,v=>v>1800?C('--bad'):v>=1600?C('--ok'):C('--c2'))};
+ const dsum=()=>{const t=tot();
+  $('dsum').innerHTML='Comido <b style="color:'+(t>1800?'var(--bad)':'inherit')+'">'+t+'</b> / 1800 kcal · '+(t>1800?'te has pasado en <b>'+(t-1800)+'</b>':'quedan <b>'+(1800-t)+'</b>');
+  try{if(Object.keys(ds).length)localStorage.setItem('dtot'+today,String(t));else localStorage.removeItem('dtot'+today)}catch(x){}drawCal()};
+ document.querySelectorAll('.dk').forEach(c=>{const i=c.dataset.m;c.checked=ds[i]===c.dataset.o;c.onchange=()=>{if(c.checked){ds[i]=c.dataset.o;document.querySelectorAll('.dk[data-m="'+i+'"]').forEach(o=>{if(o!==c)o.checked=false})}else delete ds[i];save();dsum()}});
+ document.querySelectorAll('.dx').forEach(n=>{const i=n.dataset.m;n.value=(dx[i]&&dx[i].k)||'';n.oninput=()=>{dx[i]=dx[i]||{};dx[i].k=+n.value||0;if(dx[i].k>0){ds[i]='X';document.querySelectorAll('.dk[data-m="'+i+'"]').forEach(o=>{o.checked=o.dataset.o==='X'})}save();dsum()}});
+ document.querySelectorAll('.dn').forEach(n=>{const i=n.dataset.m;n.value=(dx[i]&&dx[i].t)||'';n.oninput=()=>{dx[i]=dx[i]||{};dx[i].t=n.value;save()}});
+ dsum();if(!dl0&&Object.keys(ds).length)sync();
  const w90=W.filter(x=>x.ctl!=null);line('c1',[w90.map(x=>x.ctl),w90.map(x=>x.atl)],['--c1','--c2'],{min:0,l:[w90[0].id.slice(5),w90[w90.length-1].id.slice(5)]});
  const mon=d=>{const x=new Date(d+'T00:00');x.setDate(x.getDate()-((x.getDay()+6)%7));return iso(x)},wk={};
  A.forEach(a=>{const k=mon(a.start_date_local.slice(0,10));wk[k]=(wk[k]||0)+(a.moving_time||0)/3600});
@@ -129,7 +147,7 @@ async function load(){
  <li><b>Volumen:</b> ${f(avg(wks.slice(-4,-1).map(k=>wk[k])))} h/semana de media en las últimas 3 semanas cerradas.</li>
  <li><b>Peso:</b> ${f(wl)} kg · faltan ${f(wl?wl-80:null)} kg para el objetivo de 80.</li></ul></div>
  <div class="card"><small>Cifras automáticas de intervals.icu. Para el análisis completo (qué cambiar en el plan), pídeselo a Claude.</small></div>`;
- $('sub').textContent='Actualizado '+T.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})+' · '+today+' · v6';
+ $('sub').textContent='Actualizado '+T.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})+' · '+today+' · v9';
  $('app').style.display='block';
 }
 load();
